@@ -1,0 +1,13 @@
+{
+  "name": "shopping-runs",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "express-session": "^1.18.1",
+    "google-auth-library": "^9.15.0",
+    "qrcode": "^1.5.4"
+  }
+}
