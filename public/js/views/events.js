@@ -16,8 +16,9 @@ export async function eventsView(app) {
   maps = [];
 
   app.innerHTML = `<h2 style="margin-bottom:16px">Shopping events</h2><p class="err" id="msg"></p>` + (evs.map(e => `
-  <div class="card"><div class="row"><h3>${esc(e.title)}</h3><span class="chip ${e.status}">${e.status}</span></div>
+  <div class="card${e.isShopper ? ' mine' : ''}"><div class="row"><h3>${esc(e.title)}</h3><span class="chip ${e.status}">${e.status}</span>${e.isShopper ? '<span class="chip shopper">You\'re the shopper</span>' : ''}</div>
   <p class="mut" style="margin:6px 0 12px">${esc(e.store_name)} · ${esc(e.address || '')}<br>Orders open ${fmt(e.open_at)}, close ${fmt(e.close_at)}${e.shoppers.length ? '<br>Shopper' + (e.shoppers.length > 1 ? 's' : '') + ': ' + esc(e.shoppers.join(', ')) : ''}</p>
+  ${e.isShopper ? `<p class="shopper-note">${e.status === 'closed' ? 'Orders are closed, so your shopping list is ready.' : `Your shopping list unlocks when orders close on ${fmt(e.close_at)}.`}</p>` : ''}
   ${hasLocation(e) ? `
   <div class="map" id="m${e.id}" role="region" aria-label="Map of ${esc(e.store_name)}"></div>
   <p class="mut map-links"><span id="d${e.id}">Finding your location…</span> · <a href="${directionsUrl(e)}" target="_blank" rel="noopener">Directions in Google Maps</a></p>` : ''}

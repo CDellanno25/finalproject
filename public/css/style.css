@@ -49,6 +49,44 @@ nav {
   flex-wrap: wrap;
 }
 
+#who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 220px;
+  padding: 3px 14px 3px 3px;
+  border: 2px solid var(--ink);
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--tag);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.user-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* Buttons */
 
 button, .btn {
@@ -136,6 +174,22 @@ main {
 .chip.closed {
   background: var(--ink);
   color: var(--card);
+}
+
+.chip.shopper {
+  background: var(--bad);
+  color: #fff;
+}
+
+.card.mine {
+  border-color: var(--bad);
+  border-left-width: 8px;
+}
+
+.shopper-note {
+  margin: 0 0 12px;
+  color: var(--bad);
+  font-weight: 600;
 }
 
 /* Forms */

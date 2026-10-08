@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { state, go } from './state.js';
-import { $ } from './util.js';
+import { $, esc } from './util.js';
 import { loginView } from './views/login.js';
 import { eventsView } from './views/events.js';
 import { orderView } from './views/order.js';
@@ -18,10 +18,21 @@ function render() {
 
   $('#nav').innerHTML = tabs.map(([v, l]) => `<button data-tab="${v}" class="${state.view === v || (v === 'events' && ['order', 'shop'].includes(state.view)) ? 'on' : ''}">${l}</button>`).join('');
   $('#nav').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
-  $('#who').innerHTML = `${state.me.name} <button id="out">Sign out</button>`;
+  $('#who').innerHTML = `<span class="user-chip" title="${esc(state.me.email)}"><span class="avatar" aria-hidden="true">${esc(initials(state.me))}</span><span class="user-name">${esc(state.me.name || state.me.email)}</span></span><button id="out">Sign out</button>`;
   $('#out').onclick = async () => { await api('/logout', 'POST'); state.me = null; render(); };
   
   views[state.view](app);
+}
+
+function initials({ name, email }) {
+  const firsts = (name || email || '')
+    .split(/\s+/)
+    .map(word => word.match(/[\p{L}\p{N}]/u)?.[0])
+    .filter(Boolean);
+
+  const letters = firsts.length > 1 ? [firsts[0], firsts.at(-1)] : firsts;
+
+  return (letters.join('') || '?').toUpperCase();
 }
 
 state.render = render;
