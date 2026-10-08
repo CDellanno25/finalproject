@@ -32,7 +32,7 @@ export async function adminView(app) {
     <div class="card">
       <h3 style="margin-bottom:10px">Create a shopping event</h3>
       ${stores.length ? `
-        <form id="ne">
+        <form id="ne" class="wide">
           <label>Title<input name="title" required placeholder="9/22 Target Run"></label>
           <label>Store<select name="store_id">${stores.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></label>
           <label>Opens<input name="open_at" type="datetime-local" required></label>
@@ -69,9 +69,6 @@ export async function adminView(app) {
   app.querySelectorAll('[data-orders]').forEach(b => b.onclick = () => showOrders(+b.dataset.orders));
 }
 
-// "Add a store" works in two steps:
-//   1. Find address: look it up and show the match (nothing is saved yet)
-//   2. Save store:   save it, using the match the admin just checked
 function wireStoreForm(app) {
   const form = $('#ns');
   const preview = $('#preview');
@@ -79,8 +76,6 @@ function wireStoreForm(app) {
   const saveButton = $('#pv-save');
   const addressInput = form.elements.address;
 
-  // Editing the address makes the shown match out of date, so hide it.
-  // That way the admin can never save a match they haven't seen.
   addressInput.oninput = () => { preview.hidden = true; };
 
   form.onsubmit = act(async () => {
@@ -93,7 +88,6 @@ function wireStoreForm(app) {
     try {
       const place = await api('/geocode', 'POST', { address });
 
-      // If the admin typed something new while we were waiting, this result is stale.
       if (addressInput.value !== address) return;
 
       $('#pv-addr').textContent = place.matched;
@@ -107,7 +101,7 @@ function wireStoreForm(app) {
   });
 
   saveButton.onclick = act(async () => {
-    if (!form.reportValidity()) return; // e.g. the name was cleared after Find
+    if (!form.reportValidity()) return;
 
     saveButton.disabled = true;
     saveButton.textContent = 'Saving…';
@@ -115,7 +109,7 @@ function wireStoreForm(app) {
     try {
       const saved = await api('/stores', 'POST', fd(form));
 
-      await adminView(app); // re-render so the new store appears in the event form's dropdown
+      await adminView(app);
       $('#ok').textContent = `Saved. Located at: ${saved.matched}`;
     } finally {
       saveButton.disabled = false;

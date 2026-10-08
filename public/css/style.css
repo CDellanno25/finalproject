@@ -156,6 +156,10 @@ form {
   align-items: end;
 }
 
+form.wide {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
 label {
   display: grid;
   gap: 3px;
