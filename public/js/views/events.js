@@ -6,6 +6,8 @@ let maps = [];
 
 const hasLocation = e => e.lat != null && e.lng != null;
 
+const mapsReady = () => typeof L !== 'undefined';
+
 const directionsUrl = e =>
   `https://www.google.com/maps/dir/?api=1&destination=${e.lat},${e.lng}&travelmode=driving`;
 
@@ -20,14 +22,14 @@ export async function eventsView(app) {
   <p class="mut" style="margin:6px 0 12px">${esc(e.store_name)} · ${esc(e.address || '')}<br>Orders open ${fmt(e.open_at)}, close ${fmt(e.close_at)}${e.shoppers.length ? '<br>Shopper' + (e.shoppers.length > 1 ? 's' : '') + ': ' + esc(e.shoppers.join(', ')) : ''}</p>
   ${e.isShopper ? `<p class="shopper-note">${e.status === 'closed' ? 'Orders are closed, so your shopping list is ready.' : `Your shopping list unlocks when orders close on ${fmt(e.close_at)}.`}</p>` : ''}
   ${hasLocation(e) ? `
-  <div class="map" id="m${e.id}" role="region" aria-label="Map of ${esc(e.store_name)}"></div>
-  <p class="mut map-links"><span id="d${e.id}">Finding your location…</span> · <a href="${directionsUrl(e)}" target="_blank" rel="noopener">Directions in Google Maps</a></p>` : ''}
+  ${mapsReady() ? `<div class="map" id="m${e.id}" role="region" aria-label="Map for ${esc(e.title)} at ${esc(e.store_name)}"></div>` : ''}
+  <p class="mut map-links">${mapsReady() ? `<span id="d${e.id}">Finding your location…</span> · ` : ''}<a href="${directionsUrl(e)}" target="_blank" rel="noopener">Directions in Google Maps</a></p>` : ''}
   <div class="row">${e.status === 'open' ? `<button class="pri" data-go="order" data-id="${e.id}">Add items</button>` : `<button data-go="order" data-id="${e.id}">My order</button>`}
   ${e.status === 'closed' && (e.isShopper || state.me.role === 'admin') ? `<button class="pri" data-go="shop" data-id="${e.id}">Shopping list</button>` : ''}</div></div>`).join('') || '<div class="card">No events yet. An admin can create one.</div>');
 
   wireNav(app);
 
-  const cards = evs.filter(hasLocation).map(e => ({
+  const cards = (mapsReady() ? evs.filter(hasLocation) : []).map(e => ({
     e,
     map: makeMap(e),
     label: document.getElementById('d' + e.id),
@@ -98,7 +100,7 @@ function drawRoute(map, here, e, route) {
     : L.polyline([[here.lat, here.lng], [e.lat, e.lng]], { color: '#5b6b60', weight: 3, dashArray: '6 8' });
 
   line.addTo(map);
-  map.fitBounds(line.getBounds(), { padding: [24, 24], maxZoom: 16 });
+  map.fitBounds(line.getBounds(), { paddingTopLeft: [24, 48], paddingBottomRight: [24, 24], maxZoom: 16, animate: false });
 }
 
 function currentPosition() {

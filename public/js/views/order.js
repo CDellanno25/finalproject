@@ -20,7 +20,21 @@ export async function orderView(app) {
 
   const f = $('#add');
 
-  if (f) f.onsubmit = act(async ev => { await api(`/events/${id}/items`, 'POST', fd(ev.target)); await orderView(app); });
+  if (f) f.onsubmit = act(async ev => {
+    const button = f.querySelector('button');
+
+    if (button.disabled) return;
+
+    button.disabled = true;
+
+    try {
+      await api(`/events/${id}/items`, 'POST', fd(ev.target));
+      await orderView(app);
+    } catch (x) {
+      button.disabled = false;
+      throw x;
+    }
+  });
   
   const co = $('#checkout');
 

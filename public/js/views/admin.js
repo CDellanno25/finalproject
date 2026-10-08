@@ -73,13 +73,23 @@ export async function adminView(app) {
 
   if (ne) ne.onsubmit = act(async e => {
     const f = e.target, b = fd(f);
+    const button = f.querySelector('button');
 
-    b.shopper_ids = [...f.shopper_ids.selectedOptions].map(o => +o.value);
-    b.open_at = new Date(b.open_at).toISOString();
-    b.close_at = new Date(b.close_at).toISOString();
+    if (button.disabled) return;
 
-    await api('/events', 'POST', b);
-    go('events');
+    button.disabled = true;
+
+    try {
+      b.shopper_ids = [...f.shopper_ids.selectedOptions].map(o => +o.value);
+      b.open_at = new Date(b.open_at).toISOString();
+      b.close_at = new Date(b.close_at).toISOString();
+
+      await api('/events', 'POST', b);
+      go('events');
+    } catch (x) {
+      button.disabled = false;
+      throw x;
+    }
   });
 
   app.querySelectorAll('[data-orders]').forEach(b => b.onclick = act(() => toggleOrders(b)));
@@ -219,5 +229,16 @@ async function showOrders(eventId) {
   const box = $('#p' + eventId);
 
   box.innerHTML = orders.map(o => `<label class="line" style="font-weight:400;font-size:1rem"><input type="checkbox" data-paid="${o.id}" ${o.paid ? 'checked' : ''}><span class="n">${esc(o.buyer)}${o.org ? ' · ' + esc(o.org) : ''}</span><span class="price">${usd(o.total)}</span></label>`).join('') || '<p class="mut">No orders.</p>';
-  box.querySelectorAll('[data-paid]').forEach(c => c.onchange = () => api(`/orders/${c.dataset.paid}/paid`, 'POST', { paid: c.checked }));
+  box.querySelectorAll('[data-paid]').forEach(c => c.onchange = async () => {
+    const note = $('#events-msg');
+
+    note.textContent = '';
+
+    try {
+      await api(`/orders/${c.dataset.paid}/paid`, 'POST', { paid: c.checked });
+    } catch (x) {
+      c.checked = !c.checked;
+      note.textContent = `Couldn't save that payment: ${x.message}`;
+    }
+  });
 }

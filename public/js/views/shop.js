@@ -24,8 +24,9 @@ export async function shopView(app) {
 
       await shopView(app);
       if (!r.ok) say('Someone else already marked this item.');
-    } catch (x) { 
-      say(x.message); 
+    } catch (x) {
+      box.checked = !box.checked;
+      say(x.message);
     }
   });
 }

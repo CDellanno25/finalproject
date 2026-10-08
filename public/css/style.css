@@ -1,5 +1,5 @@
 :root {
-  --bg: #eef1ea;
+  --bg: #deddd5;
   --ink: #14281d;
   --mut: #5b6b60;
   --line: #c8d0c1;
@@ -105,7 +105,7 @@ button:hover {
 }
 
 button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 3px solid var(--tag);
+  outline: 3px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -124,6 +124,7 @@ main {
   max-width: 820px;
   margin: 0 auto;
   padding: 24px 16px 80px;
+  overflow-wrap: anywhere;
 }
 
 .card {
@@ -165,6 +166,7 @@ main {
   font-size: 0.85rem;
   font-weight: 600;
   background: var(--line);
+  color: var(--ink);
 }
 
 .chip.open {
@@ -242,6 +244,7 @@ label {
 .price {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .total {
