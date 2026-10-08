@@ -14,9 +14,6 @@ const oauth = CID ? new OAuth2Client(CID) : null;
 
 const money = value => Math.round(value * 100) / 100;
 
-// OpenStreetMap Nominatim and OSRM
-//   https://operations.osmfoundation.org/policies/nominatim/
-//   https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server
 const OSM_USER_AGENT =
   "ShoppingRuns/1.0 (WPI CS4241 class project; https://github.com/CDellanno25/finalproject)";
 
@@ -41,6 +38,40 @@ function throttledFetch(gapMs) {
 }
 
 const nominatimFetch = throttledFetch(1000);
+const osrmFetch = throttledFetch(1000);
+
+async function drivingRoute(from, to) {
+  const points = `${from.lng},${from.lat};${to.lng},${to.lat}`;
+
+  const response = await osrmFetch(
+    `https://router.project-osrm.org/route/v1/driving/${points}?overview=false`
+  );
+
+  const data = await response.json().catch(() => null);
+
+  if (data?.code === "Ok" && data.routes?.length) {
+    return { meters: data.routes[0].distance, seconds: data.routes[0].duration };
+  }
+
+  if (data?.code === "NoRoute") return null;
+
+  throw new Error(
+    `OSRM responded with ${response.status}${data?.code ? ` (${data.code})` : ""}`
+  );
+}
+
+function formatDrive({ meters, seconds }) {
+  const miles = (meters / 1609.344).toFixed(1);
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  const hours = Math.floor(minutes / 60);
+
+  const time =
+    hours === 0 ? `${minutes} min`
+    : minutes % 60 === 0 ? `${hours} hr`
+    : `${hours} hr ${minutes % 60} min`;
+
+  return `${miles} mi · about ${time} drive`;
+}
 
 const geocodeCache = new Map();
 const GEOCODE_CACHE_MS = 60 * 60 * 1000;
@@ -965,36 +996,17 @@ app.get("/api/stores/:id/distance", need, async (req, res) => {
     return fail(res, 400, "Invalid coordinates.");
   }
 
-  const key = process.env.MAPS_API_KEY;
+  const round3 = value => Math.round(value * 1000) / 1000;
+  const from = { lat: round3(latitude), lng: round3(longitude) };
 
-  if (key) {
-    try {
-      const url = new URL(
-        "https://maps.googleapis.com/maps/api/distancematrix/json"
-      );
+  try {
+    const route = await drivingRoute(from, { lat: store.lat, lng: store.lng });
 
-      url.search = new URLSearchParams({
-        units: "imperial",
-        origins: `${latitude},${longitude}`,
-        destinations: `${store.lat},${store.lng}`,
-        key,
-      }).toString();
-
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const element = data.rows?.[0]?.elements?.[0];
-
-        if (element?.status === "OK") {
-          return res.json({
-            text: `${element.distance.text} · ${element.duration.text} drive`,
-          });
-        }
-      }
-    } catch {}
+    if (route) {
+      return res.json({ text: formatDrive(route) });
+    }
+  } catch (error) {
+    console.error("Routing failed:", error.message);
   }
 
   const radius = 3958.8;
