@@ -60,10 +60,11 @@ export async function adminView(app) {
     </div>
 
     <div class="card">
-      <h3 style="margin-bottom:8px">Payments</h3>
+      <h3 style="margin-bottom:8px">Events and payments</h3>
       ${evs.map(e => `
-        <div class="line"><span class="n">${esc(e.title)}</span><button data-orders="${e.id}">View orders</button></div>
-        <div id="p${e.id}"></div>`).join('') || '<p class="mut">No events yet.</p>'}
+        <div class="line"><span class="n">${esc(e.title)}</span><button data-orders="${e.id}" aria-expanded="false" aria-controls="p${e.id}">View orders</button><button data-del-event="${e.id}">Delete</button></div>
+        <div id="p${e.id}" hidden></div>`).join('') || '<p class="mut">No events yet.</p>'}
+      <p class="mut" id="events-msg" role="status"></p>
     </div>`;
 
   wireStoreForm(app);
@@ -81,7 +82,7 @@ export async function adminView(app) {
     go('events');
   });
 
-  app.querySelectorAll('[data-orders]').forEach(b => b.onclick = () => showOrders(+b.dataset.orders));
+  app.querySelectorAll('[data-orders]').forEach(b => b.onclick = act(() => toggleOrders(b)));
 
   app.querySelectorAll('[data-del-store]').forEach(b => b.onclick = act(async () => {
     const store = stores.find(s => s.id === +b.dataset.delStore);
@@ -99,6 +100,45 @@ export async function adminView(app) {
     await adminView(app);
     $('#stores-msg').textContent = `Deleted ${store.name}.`;
   }));
+
+  app.querySelectorAll('[data-del-event]').forEach(b => b.onclick = act(async () => {
+    const event = evs.find(e => e.id === +b.dataset.delEvent);
+
+    b.disabled = true;
+
+    try {
+      const orders = await api(`/events/${event.id}/orders`);
+
+      if (!confirm(deleteEventMessage(event, orders))) return;
+
+      const result = await api(`/events/${event.id}`, 'DELETE');
+
+      await adminView(app);
+      $('#events-msg').textContent = `Deleted "${event.title}"` +
+        (result.orders ? ` and ${result.orders} order${result.orders === 1 ? '' : 's'}.` : '.');
+    } finally {
+      b.disabled = false;
+    }
+  }));
+}
+
+function deleteEventMessage(event, orders) {
+  if (!orders.length) {
+    return `Delete "${event.title}"? This can't be undone.`;
+  }
+
+  const paid = orders.filter(o => o.paid);
+  const collected = paid.reduce((sum, o) => sum + o.total, 0);
+
+  return [
+    `Delete "${event.title}"?`,
+    '',
+    `This will also permanently delete ${orders.length} order${orders.length === 1 ? '' : 's'} and every item in them` +
+      (paid.length ? `, including ${paid.length} marked paid (${usd(collected)}).` : '.'),
+    'Leaderboard totals will go down.',
+    '',
+    "This can't be undone.",
+  ].join('\n');
 }
 
 function wireStoreForm(app) {
@@ -149,6 +189,29 @@ function wireStoreForm(app) {
       saveButton.textContent = 'Save store';
     }
   });
+}
+
+async function toggleOrders(button) {
+  const box = $('#p' + button.dataset.orders);
+
+  if (button.getAttribute('aria-expanded') === 'true') {
+    box.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+    button.textContent = 'View orders';
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    await showOrders(+button.dataset.orders);
+  } finally {
+    button.disabled = false;
+  }
+
+  box.hidden = false;
+  button.setAttribute('aria-expanded', 'true');
+  button.textContent = 'Hide orders';
 }
 
 async function showOrders(eventId) {

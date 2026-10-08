@@ -950,6 +950,39 @@ app.get("/api/events/:id/orders", need, admin, async (req, res) => {
   res.json(results);
 });
 
+app.delete("/api/events/:id", need, admin, async (req, res) => {
+  const id = Number(req.params.id);
+  const event = await mongoDb.collection("events").findOne({ id });
+
+  if (!event) {
+    return fail(res, 404, "Event not found.");
+  }
+
+  const orderIds = (
+    await mongoDb
+      .collection("orders")
+      .find({ event_id: id }, { projection: { id: 1 } })
+      .toArray()
+  ).map(order => order.id);
+
+  const items = await mongoDb
+    .collection("items")
+    .deleteMany({ order_id: { $in: orderIds } });
+
+  const orders = await mongoDb
+    .collection("orders")
+    .deleteMany({ event_id: id });
+
+  await mongoDb.collection("event_shoppers").deleteMany({ event_id: id });
+  await mongoDb.collection("events").deleteOne({ id });
+
+  res.json({
+    ok: true,
+    orders: orders.deletedCount,
+    items: items.deletedCount,
+  });
+});
+
 app.post("/api/orders/:id/paid", need, admin, async (req, res) => {
   if (typeof req.body.paid !== "boolean") {
     return fail(res, 400, "Paid must be true or false.");
