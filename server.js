@@ -14,6 +14,63 @@ const oauth = CID ? new OAuth2Client(CID) : null;
 
 const money = value => Math.round(value * 100) / 100;
 
+// OpenStreetMap Nominatim and OSRM
+//   https://operations.osmfoundation.org/policies/nominatim/
+//   https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server
+const OSM_USER_AGENT =
+  "ShoppingRuns/1.0 (WPI CS4241 class project; https://github.com/CDellanno25/finalproject)";
+
+// 1 sec delay due to usage policies
+function throttledFetch(gapMs) {
+  let nextSlot = 0;
+
+  return async url => {
+    const now = Date.now();
+    const start = Math.max(now, nextSlot);
+
+    nextSlot = start + gapMs;
+
+    if (start > now) {
+      await new Promise(resolve => setTimeout(resolve, start - now));
+    }
+
+    return fetch(url, {
+      headers: { "User-Agent": OSM_USER_AGENT },
+      signal: AbortSignal.timeout(10000),
+    });
+  };
+}
+
+const nominatimFetch = throttledFetch(1000);
+
+async function geocode(address) {
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+
+  url.search = new URLSearchParams({
+    q: address,
+    format: "jsonv2",
+    limit: "1",
+    countrycodes: "us",
+  }).toString();
+
+  const response = await nominatimFetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Nominatim responded with ${response.status}`);
+  }
+
+  const [place] = await response.json();
+
+  if (!place) return null;
+
+  return {
+    lat: Number(place.lat),
+    lng: Number(place.lon),
+    matched: place.display_name,
+    precise: place.place_rank >= 26,
+  };
+}
+
 function status(event) {
   const now = Date.now();
 
@@ -276,37 +333,53 @@ app.get("/api/stores", need, async (req, res) => {
 });
 
 app.post("/api/stores", need, admin, async (req, res) => {
-  const { name, address, lat, lng, tax_rate } = req.body;
+  const { name, address, tax_rate } = req.body;
+  const taxRate = Number(tax_rate || 0);
 
   if (typeof name !== "string" || !name.trim()) {
     return fail(res, 400, "Store name is required.");
   }
 
-  const latitude = lat === "" || lat == null ? null : Number(lat);
-  const longitude = lng === "" || lng == null ? null : Number(lng);
-  const taxRate = Number(tax_rate || 0);
+  if (typeof address !== "string" || !address.trim()) {
+    return fail(res, 400, "Store address is required.");
+  }
 
-  if (
-    (latitude !== null &&
-      (!Number.isFinite(latitude) || Math.abs(latitude) > 90)) ||
-    (longitude !== null &&
-      (!Number.isFinite(longitude) || Math.abs(longitude) > 180)) ||
-    !Number.isFinite(taxRate) ||
-    taxRate < 0
-  ) {
-    return fail(res, 400, "Enter valid coordinates and a tax rate.");
+  if (!Number.isFinite(taxRate) || taxRate < 0) {
+    return fail(res, 400, "Enter a valid tax rate.");
+  }
+
+  let place;
+
+  try {
+    place = await geocode(address.trim());
+  } catch (error) {
+    console.error("Geocoding failed:", error.message);
+    return fail(
+      res,
+      502,
+      "The address lookup service is unavailable. Try again in a minute."
+    );
+  }
+
+  if (!place) {
+    return fail(
+      res,
+      400,
+      "Couldn't find that address. Include the street number, city, and state."
+    );
   }
 
   await mongoDb.collection("stores").insertOne({
     id: await nextId("stores"),
     name: name.trim(),
-    address: typeof address === "string" ? address : "",
-    lat: latitude,
-    lng: longitude,
+    address: address.trim(),
+    matched_address: place.matched,
+    lat: place.lat,
+    lng: place.lng,
     tax_rate: taxRate / 100,
   });
 
-  res.json({ ok: true });
+  res.json({ ok: true, matched: place.matched, precise: place.precise });
 });
 
 app.get("/api/users", need, admin, async (req, res) => {
