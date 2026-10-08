@@ -5,12 +5,26 @@ const session = require("express-session");
 const { MongoClient } = require("mongodb");
 const QRCode = require("qrcode");
 const { OAuth2Client } = require("google-auth-library");
+const crypto = require("crypto");
 
 const mongoClient = new MongoClient(process.env.MONGODB_URI);
 let mongoDb;
 
 const CID = process.env.GOOGLE_CLIENT_ID;
 const oauth = CID ? new OAuth2Client(CID) : null;
+const DEV_LOGIN = !CID && process.env.DEV_LOGIN === "true";
+
+if (!CID && !DEV_LOGIN) {
+  console.warn("No sign-in method is set up. Set GOOGLE_CLIENT_ID, or DEV_LOGIN=true for local testing.");
+}
+
+function sessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+
+  console.warn("SESSION_SECRET is not set, so a random one is being used. Everyone will be signed out when the server restarts.");
+
+  return crypto.randomBytes(32).toString("hex");
+}
 
 const money = value => Math.round(value * 100) / 100;
 
@@ -235,7 +249,7 @@ app.use(express.json());
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "dev-secret",
+    secret: sessionSecret(),
     resave: false,
     saveUninitialized: false,
     cookie: { sameSite: "lax" },
@@ -354,7 +368,7 @@ async function totals(order, event) {
 }
 
 app.get("/api/config", (req, res) => {
-  res.json({ googleClientId: CID || null });
+  res.json({ googleClientId: CID || null, devLogin: DEV_LOGIN });
 });
 
 app.post("/api/auth/google", async (req, res) => {
@@ -390,7 +404,7 @@ app.post("/api/auth/google", async (req, res) => {
 });
 
 app.post("/api/auth/dev", async (req, res) => {
-  if (CID) {
+  if (!DEV_LOGIN) {
     return fail(res, 403, "Dev login is off.");
   }
 
