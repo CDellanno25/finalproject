@@ -20,7 +20,6 @@ const money = value => Math.round(value * 100) / 100;
 const OSM_USER_AGENT =
   "ShoppingRuns/1.0 (WPI CS4241 class project; https://github.com/CDellanno25/finalproject)";
 
-// 1 sec delay due to usage policies
 function throttledFetch(gapMs) {
   let nextSlot = 0;
 
@@ -43,7 +42,25 @@ function throttledFetch(gapMs) {
 
 const nominatimFetch = throttledFetch(1000);
 
+const geocodeCache = new Map();
+const GEOCODE_CACHE_MS = 60 * 60 * 1000;
+
 async function geocode(address) {
+  const key = address.trim().replace(/\s+/g, " ").toLowerCase();
+  const cached = geocodeCache.get(key);
+
+  if (cached && cached.expires > Date.now()) {
+    return cached.place;
+  }
+
+  const place = await lookupAddress(address);
+
+  geocodeCache.set(key, { place, expires: Date.now() + GEOCODE_CACHE_MS });
+
+  return place;
+}
+
+async function lookupAddress(address) {
   const url = new URL("https://nominatim.openstreetmap.org/search");
 
   url.search = new URLSearchParams({
@@ -69,6 +86,30 @@ async function geocode(address) {
     matched: place.display_name,
     precise: place.place_rank >= 26,
   };
+}
+
+async function geocodeOrFail(res, address) {
+  if (typeof address !== "string" || !address.trim()) {
+    fail(res, 400, "Store address is required.");
+    return null;
+  }
+
+  let place;
+
+  try {
+    place = await geocode(address.trim());
+  } catch (error) {
+    console.error("Geocoding failed:", error.message);
+    fail(res, 502, "The address lookup service is unavailable. Try again in a minute.");
+    return null;
+  }
+
+  if (!place) {
+    fail(res, 400, "Couldn't find that address. Include the street number, city, and state.");
+    return null;
+  }
+
+  return place;
 }
 
 function status(event) {
@@ -332,6 +373,14 @@ app.get("/api/stores", need, async (req, res) => {
   res.json(stores);
 });
 
+app.post("/api/geocode", need, admin, async (req, res) => {
+  const place = await geocodeOrFail(res, req.body.address);
+
+  if (!place) return;
+
+  res.json(place);
+});
+
 app.post("/api/stores", need, admin, async (req, res) => {
   const { name, address, tax_rate } = req.body;
   const taxRate = Number(tax_rate || 0);
@@ -340,34 +389,13 @@ app.post("/api/stores", need, admin, async (req, res) => {
     return fail(res, 400, "Store name is required.");
   }
 
-  if (typeof address !== "string" || !address.trim()) {
-    return fail(res, 400, "Store address is required.");
-  }
-
   if (!Number.isFinite(taxRate) || taxRate < 0) {
     return fail(res, 400, "Enter a valid tax rate.");
   }
 
-  let place;
+  const place = await geocodeOrFail(res, address);
 
-  try {
-    place = await geocode(address.trim());
-  } catch (error) {
-    console.error("Geocoding failed:", error.message);
-    return fail(
-      res,
-      502,
-      "The address lookup service is unavailable. Try again in a minute."
-    );
-  }
-
-  if (!place) {
-    return fail(
-      res,
-      400,
-      "Couldn't find that address. Include the street number, city, and state."
-    );
-  }
+  if (!place) return;
 
   await mongoDb.collection("stores").insertOne({
     id: await nextId("stores"),
