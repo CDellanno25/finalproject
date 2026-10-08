@@ -220,3 +220,16 @@ td, th {
   text-align: left;
   border-bottom: 1px dashed var(--line);
 }
+
+.map {
+  position: relative;
+  z-index: 0;
+  height: 220px;
+  margin: 0 0 8px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+}
+
+.map-links {
+  margin: 0 0 12px;
+}

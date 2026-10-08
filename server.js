@@ -44,13 +44,19 @@ async function drivingRoute(from, to) {
   const points = `${from.lng},${from.lat};${to.lng},${to.lat}`;
 
   const response = await osrmFetch(
-    `https://router.project-osrm.org/route/v1/driving/${points}?overview=false`
+    `https://router.project-osrm.org/route/v1/driving/${points}?overview=simplified&geometries=geojson`
   );
 
   const data = await response.json().catch(() => null);
 
   if (data?.code === "Ok" && data.routes?.length) {
-    return { meters: data.routes[0].distance, seconds: data.routes[0].duration };
+    const [best] = data.routes;
+
+    return {
+      meters: best.distance,
+      seconds: best.duration,
+      path: best.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+    };
   }
 
   if (data?.code === "NoRoute") return null;
@@ -58,6 +64,25 @@ async function drivingRoute(from, to) {
   throw new Error(
     `OSRM responded with ${response.status}${data?.code ? ` (${data.code})` : ""}`
   );
+}
+
+const routeCache = new Map();
+const ROUTE_CACHE_MS = 10 * 60 * 1000;
+
+async function cachedRoute(from, to) {
+  const key = `${from.lat},${from.lng}|${to.lat},${to.lng}`;
+  const cached = routeCache.get(key);
+
+  if (cached && cached.expires > Date.now()) {
+    return cached.route;
+  }
+
+  const route = await drivingRoute(from, to);
+
+  if (routeCache.size >= 500) routeCache.clear();
+  routeCache.set(key, { route, expires: Date.now() + ROUTE_CACHE_MS });
+
+  return route;
 }
 
 function formatDrive({ meters, seconds }) {
@@ -1000,10 +1025,10 @@ app.get("/api/stores/:id/distance", need, async (req, res) => {
   const from = { lat: round3(latitude), lng: round3(longitude) };
 
   try {
-    const route = await drivingRoute(from, { lat: store.lat, lng: store.lng });
+    const route = await cachedRoute(from, { lat: store.lat, lng: store.lng });
 
     if (route) {
-      return res.json({ text: formatDrive(route) });
+      return res.json({ text: formatDrive(route), route: route.path });
     }
   } catch (error) {
     console.error("Routing failed:", error.message);
@@ -1025,6 +1050,7 @@ app.get("/api/stores/:id/distance", need, async (req, res) => {
 
   res.json({
     text: `${distance.toFixed(1)} mi (straight line)`,
+    route: null,
   });
 });
 
