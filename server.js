@@ -124,6 +124,7 @@ async function lookupAddress(address) {
     format: "jsonv2",
     limit: "1",
     countrycodes: "us",
+    addressdetails: "1",
   }).toString();
 
   const response = await nominatimFetch(url);
@@ -140,8 +141,18 @@ async function lookupAddress(address) {
     lat: Number(place.lat),
     lng: Number(place.lon),
     matched: place.display_name,
+    formatted: formatAddress(place.address) || place.display_name,
     precise: place.place_rank >= 26,
   };
+}
+
+function formatAddress(parts = {}) {
+  const street = [parts.house_number, parts.road].filter(Boolean).join(" ");
+  const city = parts.city || parts.town || parts.village || parts.hamlet || parts.suburb;
+  const state = parts["ISO3166-2-lvl4"]?.split("-")[1] || parts.state;
+  const stateZip = [state, parts.postcode].filter(Boolean).join(" ");
+
+  return [street, city, stateZip].filter(Boolean).join(", ");
 }
 
 async function geocodeOrFail(res, address) {
@@ -456,14 +467,40 @@ app.post("/api/stores", need, admin, async (req, res) => {
   await mongoDb.collection("stores").insertOne({
     id: await nextId("stores"),
     name: name.trim(),
-    address: address.trim(),
+    address: place.formatted,
+    typed_address: address.trim(),
     matched_address: place.matched,
     lat: place.lat,
     lng: place.lng,
     tax_rate: taxRate / 100,
   });
 
-  res.json({ ok: true, matched: place.matched, precise: place.precise });
+  res.json({ ok: true, address: place.formatted, precise: place.precise });
+});
+
+app.delete("/api/stores/:id", need, admin, async (req, res) => {
+  const id = Number(req.params.id);
+  const store = await mongoDb.collection("stores").findOne({ id });
+
+  if (!store) {
+    return fail(res, 404, "Store not found.");
+  }
+
+  const eventCount = await mongoDb
+    .collection("events")
+    .countDocuments({ store_id: id });
+
+  if (eventCount > 0) {
+    return fail(
+      res,
+      409,
+      `${store.name} is used by ${eventCount} event${eventCount === 1 ? "" : "s"}, so it can't be deleted.`
+    );
+  }
+
+  await mongoDb.collection("stores").deleteOne({ id });
+
+  res.json({ ok: true });
 });
 
 app.get("/api/users", need, admin, async (req, res) => {

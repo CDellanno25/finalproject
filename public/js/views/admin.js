@@ -18,7 +18,8 @@ export async function adminView(app) {
         <button>Find address</button>
       </form>
       <div id="preview" hidden>
-        <p style="margin:12px 0 6px">Found: <strong id="pv-addr"></strong></p>
+        <p style="margin:12px 0 2px">Found: <strong id="pv-addr"></strong></p>
+        <p class="mut" id="pv-full" style="margin:0 0 6px"></p>
         <p class="err" id="pv-warn" hidden>This match is approximate. Add a street number or city if it's the wrong place.</p>
         <div class="row">
           <a class="btn" id="pv-map" target="_blank" rel="noopener">View on map</a>
@@ -27,6 +28,20 @@ export async function adminView(app) {
       </div>
       <p class="mut" id="ok" role="status"></p>
       <p class="mut">Addresses are located with <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> data © OpenStreetMap contributors.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:8px">Stores</h3>
+      ${stores.map(s => {
+        const used = evs.filter(e => e.store_id === s.id).length;
+
+        return `
+        <div class="line">
+          <span class="n"><strong>${esc(s.name)}</strong><br><span class="mut">${esc(s.address || 'No address')}</span></span>
+          ${used ? `<span class="mut">Used by ${used} event${used === 1 ? '' : 's'}</span>` : `<button data-del-store="${s.id}">Delete</button>`}
+        </div>`;
+      }).join('') || '<p class="mut">No stores yet.</p>'}
+      <p class="mut" id="stores-msg" role="status"></p>
     </div>
 
     <div class="card">
@@ -67,6 +82,23 @@ export async function adminView(app) {
   });
 
   app.querySelectorAll('[data-orders]').forEach(b => b.onclick = () => showOrders(+b.dataset.orders));
+
+  app.querySelectorAll('[data-del-store]').forEach(b => b.onclick = act(async () => {
+    const store = stores.find(s => s.id === +b.dataset.delStore);
+
+    if (!confirm(`Delete ${store.name}? This can't be undone.`)) return;
+
+    b.disabled = true;
+
+    try {
+      await api(`/stores/${store.id}`, 'DELETE');
+    } finally {
+      b.disabled = false;
+    }
+
+    await adminView(app);
+    $('#stores-msg').textContent = `Deleted ${store.name}.`;
+  }));
 }
 
 function wireStoreForm(app) {
@@ -90,7 +122,8 @@ function wireStoreForm(app) {
 
       if (addressInput.value !== address) return;
 
-      $('#pv-addr').textContent = place.matched;
+      $('#pv-addr').textContent = place.formatted;
+      $('#pv-full').textContent = place.matched;
       $('#pv-warn').hidden = place.precise;
       $('#pv-map').href = `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=18/${place.lat}/${place.lng}`;
       preview.hidden = false;
@@ -110,7 +143,7 @@ function wireStoreForm(app) {
       const saved = await api('/stores', 'POST', fd(form));
 
       await adminView(app);
-      $('#ok').textContent = `Saved. Located at: ${saved.matched}`;
+      $('#ok').textContent = `Saved. Located at: ${saved.address}`;
     } finally {
       saveButton.disabled = false;
       saveButton.textContent = 'Save store';
