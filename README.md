@@ -25,9 +25,9 @@ Each buyer sees their total with sales tax and the flat fee, plus a Venmo QR cod
 - **Server (Node.js):** Express 5 with `express-session` for sessions, and the MongoDB driver for data.
 - **Database:** MongoDB Atlas, with collections for users, stores, events, orders, items and event shoppers.
 - **Authentication:** Google Sign-In. The server verifies the Google ID token with `google-auth-library` (including the audience) and keys users by Google account id.
-- **Maps:** Leaflet with OpenStreetMap tiles. Addresses are looked up with Nominatim, routes come from OSRM, and the server throttles and caches both. There is also a "Directions in Google Maps" link on each event.
+- **Maps:** `Leaflet` with `OpenStreetMap` tiles. Addresses are looked up with `Nominatim`, routes come from `OSRM`, and the server throttles and caches both. There is also a "Directions in `Google Maps`" link on each event.
 - **Payments:** the `qrcode` package generates a Venmo QR code for each order total.
-- **Hosting:** Render.
+- **Hosting:** `Render`.
 
 ## Challenges
 
