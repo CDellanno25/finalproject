@@ -38,9 +38,9 @@ Each buyer sees their total with sales tax and the flat fee, plus a Venmo QR cod
 
 ## Who did what
 
-- **Owen Nguyen:** [FILL IN. For example: Google login, map and routing features, admin store/event deletion, money-spent leaderboard, testing and bug fixes, README]
-- **Christian Dell'Anno:** [FILL IN]
-- **Raghavan Rajkumar:** [FILL IN]
+- **Owen Nguyen:** Google login w/ OAuth, map and routing features, admin store/event deletion, money-spent leaderboard, testing and bug fixes, server, README
+- **Christian Dell'Anno:** Initial app creation (design and layout), items leaderboard, initial admin page, server
+- **Raghavan Rajkumar:** Initial events page, admin page revamp, database creation and integration, server
 
 ## Running it locally
 
