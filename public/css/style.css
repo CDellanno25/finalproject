@@ -1,5 +1,5 @@
 :root {
-  --bg: #deddd5;
+  --bg: #eef1ea;
   --ink: #14281d;
   --mut: #5b6b60;
   --line: #c8d0c1;
@@ -276,6 +276,14 @@ td, th {
   padding: 8px 4px;
   text-align: left;
   border-bottom: 1px dashed var(--line);
+}
+
+td:first-child {
+  width: 2.5rem;
+}
+
+td.price {
+  text-align: right;
 }
 
 .map {

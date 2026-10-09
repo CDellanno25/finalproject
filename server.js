@@ -341,15 +341,7 @@ async function isShopper(eventId, userId) {
   );
 }
 
-async function totals(order, event) {
-  const items = order
-    ? await mongoDb
-        .collection("items")
-        .find({ order_id: order.id })
-        .sort({ id: 1 })
-        .toArray()
-    : [];
-
+function priceItems(items, event) {
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.qty,
     0
@@ -359,12 +351,68 @@ async function totals(order, event) {
   const fee = items.length ? event.fee : 0;
 
   return {
-    items,
     subtotal: money(subtotal),
     tax: money(tax),
     fee: money(fee),
     total: money(subtotal + tax + fee),
   };
+}
+
+async function totals(order, event) {
+  const items = order
+    ? await mongoDb
+        .collection("items")
+        .find({ order_id: order.id })
+        .sort({ id: 1 })
+        .toArray()
+    : [];
+
+  return { items, ...priceItems(items, event) };
+}
+
+async function moneySpentByBuyer() {
+  const [orders, items] = await Promise.all([
+    mongoDb.collection("orders").find({}).toArray(),
+    mongoDb
+      .collection("items")
+      .find({}, { projection: { order_id: 1, price: 1, qty: 1 } })
+      .sort({ id: 1 })
+      .toArray(),
+  ]);
+
+  const itemsByOrder = new Map();
+
+  for (const item of items) {
+    if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, []);
+
+    itemsByOrder.get(item.order_id).push(item);
+  }
+
+  const events = new Map();
+  const cents = new Map();
+
+  for (const order of orders) {
+    if (!events.has(order.event_id)) {
+      events.set(order.event_id, await eventRow(order.event_id));
+    }
+
+    const event = events.get(order.event_id);
+
+    if (!event) continue;
+
+    const { total } = priceItems(itemsByOrder.get(order.id) || [], event);
+
+    cents.set(
+      order.buyer_id,
+      (cents.get(order.buyer_id) || 0) + Math.round(total * 100)
+    );
+  }
+
+  return [...cents]
+    .filter(([, amount]) => Number.isFinite(amount) && amount > 0)
+    .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+    .slice(0, 10)
+    .map(([id, amount]) => ({ _id: id, n: amount / 100 }));
 }
 
 app.get("/api/config", (req, res) => {
@@ -1070,6 +1118,7 @@ app.get("/api/leaderboard", need, async (req, res) => {
 
   res.json({
     buyers: await addNames(buyerTotals),
+    spenders: await addNames(await moneySpentByBuyer()),
     shoppers: await addNames(shopperTotals),
   });
 });
