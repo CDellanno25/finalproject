@@ -1,6 +1,6 @@
 # Shopping Runs
 
-**Live app:** [PASTE RENDER URL HERE]
+**Live app:** (https://finalproject-8orx.onrender.com/)
 **Video (under 5 min):** [PASTE VIDEO LINK HERE]
 
 **Team:** Christian Dell'Anno, Raghavan Rajkumar, Owen Nguyen
