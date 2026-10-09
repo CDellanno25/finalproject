@@ -1,6 +1,6 @@
 # Shopping Runs
 **Live app:** (https://finalproject-8orx.onrender.com/)
-**Video (under 5 min):** [PASTE VIDEO LINK HERE]
+**Video (under 5 min):** https://drive.google.com/file/d/1UoQiLvTchQV2LOuM0BrXYIop_GbnqJso/view?usp=sharing
 
 **Team:** Christian Dell'Anno, Raghavan Rajkumar, Owen Nguyen
 
